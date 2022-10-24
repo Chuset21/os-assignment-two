@@ -10,13 +10,13 @@ ucontext_t *c_exec_context;
 
 #define STACK_SIZE (1024*1024)
 
-_Noreturn void *c_exec_execute(__attribute__((unused)) void *arg) {
+void *c_exec_execute(__attribute__((unused)) void *arg) {
     while (true) {
         const struct queue_entry *const pop = queue_pop_head(&q);
         if (pop == NULL) {
             usleep(100);
         } else {
-            const ucontext_t *const ucontext = (ucontext_t *) pop;
+            const ucontext_t *const ucontext = (ucontext_t *) (pop->data);
             swapcontext(c_exec_context, ucontext);
         }
     }
@@ -26,8 +26,6 @@ void sut_init() {
     q = queue_create();
     queue_init(&q);
     c_exec_context = (ucontext_t *) malloc(sizeof(ucontext_t));
-    // unnecessary
-    getcontext(c_exec_context);
 
     c_exec = (pthread_t *) malloc(sizeof(pthread_t));
     i_exec = (pthread_t *) malloc(sizeof(pthread_t));
