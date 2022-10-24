@@ -1,4 +1,4 @@
-#include "sut.h"
+#include "../sut.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -7,9 +7,9 @@ void hello1() {
     char sbuf[128];
     sut_open("127.0.0.1", 5000); // adjust the port number
     for (i = 0; i < 100; i++) {
-	sprintf(sbuf, "Hello world!, message from SUT-One i = %d \n", i);
-	sut_write(sbuf, strlen(sbuf));
-	sut_yield();
+        sprintf(sbuf, "Hello world!, message from SUT-One i = %d \n", i);
+        sut_write(sbuf, strlen(sbuf));
+        sut_yield();
     }
     sut_close();
     sut_exit();
@@ -18,8 +18,8 @@ void hello1() {
 void hello2() {
     int i;
     for (i = 0; i < 100; i++) {
-	printf("Hello world!, this is SUT-Two \n");
-	sut_yield();
+        printf("Hello world!, this is SUT-Two \n");
+        sut_yield();
     }
     sut_exit();
 }
