@@ -9,7 +9,7 @@
     5) queue_pop_head
 */
 
-#include "queue.h"
+#include "../../queue.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
