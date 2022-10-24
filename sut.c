@@ -19,15 +19,8 @@ _Noreturn void *c_exec_execute(__attribute__((unused)) void *arg) {
         } else {
             const sut_task_f task = (sut_task_f) pop;
             makecontext(c_exec_task_context, task, 0);
-            // execute task
             swapcontext(c_exec_execute_context, c_exec_task_context);
         }
-    }
-}
-
-_Noreturn void *i_exec_execute(__attribute__((unused)) void *arg) {
-    while (true) {
-
     }
 }
 
@@ -47,7 +40,6 @@ void sut_init() {
     i_exec = (pthread_t *) malloc(sizeof(pthread_t));
 
     pthread_create(c_exec, NULL, c_exec_execute, NULL);
-    pthread_create(i_exec, NULL, i_exec_execute, NULL);
 }
 
 bool sut_create(sut_task_f fn) {
@@ -69,18 +61,19 @@ void sut_exit() {
 
 }
 
-void sut_open(char *dest, int port) {
+int sut_open(char *file_name) {
+    return -1;
+}
+
+void sut_write(int fd, char *buf, int size) {
 
 }
 
-void sut_write(char *buf, int size) {
-}
-
-void sut_close() {
+void sut_close(int fd) {
 
 }
 
-char *sut_read() {
+char *sut_read(int fd, char *buf, int size) {
     return NULL;
 }
 
