@@ -1,6 +1,6 @@
 #include <pthread.h>
-#include <libc.h>
 #include <ucontext.h>
+#include <unistd.h>
 #include "sut.h"
 #include "queue.h"
 
