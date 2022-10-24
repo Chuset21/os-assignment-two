@@ -7,7 +7,7 @@
 pthread_t *c_exec;
 pthread_t *i_exec;
 struct queue q;
-ucontext_t *c_exec_execute_context, *c_exec_task_context;
+ucontext_t *c_exec_execute_context;
 
 #define STACK_SIZE (1024*1024)
 
@@ -17,9 +17,8 @@ _Noreturn void *c_exec_execute(__attribute__((unused)) void *arg) {
         if (pop == NULL) {
             usleep(100);
         } else {
-            const sut_task_f task = (sut_task_f) pop;
-            makecontext(c_exec_task_context, task, 0);
-            swapcontext(c_exec_execute_context, c_exec_task_context);
+            const ucontext_t *const ucontext = (ucontext_t *) pop;
+            swapcontext(c_exec_execute_context, ucontext);
         }
     }
 }
@@ -28,13 +27,6 @@ void sut_init() {
     q = queue_create();
     queue_init(&q);
     c_exec_execute_context = (ucontext_t *) malloc(sizeof(ucontext_t));
-    c_exec_task_context = (ucontext_t *) malloc(sizeof(ucontext_t));
-
-    char *const c_exec_s = (char *) malloc(sizeof(char) * (STACK_SIZE));
-    c_exec_task_context->uc_stack.ss_sp = c_exec_s;
-    c_exec_task_context->uc_stack.ss_size = sizeof(char) * (STACK_SIZE);
-    c_exec_task_context->uc_stack.ss_flags = 0;
-    c_exec_task_context->uc_link = c_exec_execute_context;
 
     c_exec = (pthread_t *) malloc(sizeof(pthread_t));
     i_exec = (pthread_t *) malloc(sizeof(pthread_t));
@@ -42,8 +34,8 @@ void sut_init() {
     pthread_create(c_exec, NULL, c_exec_execute, NULL);
 }
 
-bool sut_create(sut_task_f fn) {
-    struct queue_entry *const node = queue_new_node(fn);
+bool add_context_to_queue(ucontext_t *ucontext) {
+    struct queue_entry *const node = queue_new_node(ucontext);
     if (node == NULL) {
         return false;
     }
@@ -53,12 +45,34 @@ bool sut_create(sut_task_f fn) {
     return true;
 }
 
-void sut_yield() {
+bool sut_create(sut_task_f fn) {
+    ucontext_t *const ucontext = (ucontext_t *) malloc(sizeof(ucontext_t));
+    if (ucontext == NULL) {
+        return false;
+    }
 
+    char *const uc_s = (char *) malloc(sizeof(char) * (STACK_SIZE));
+    if (uc_s == NULL) {
+        return false;
+    }
+
+    ucontext->uc_stack.ss_sp = uc_s;
+    ucontext->uc_stack.ss_size = sizeof(char) * (STACK_SIZE);
+    ucontext->uc_stack.ss_flags = 0;
+    ucontext->uc_link = c_exec_execute_context;
+    makecontext(ucontext, fn, 0);
+
+    return add_context_to_queue(ucontext);
+}
+
+void sut_yield() {
+    ucontext_t *const ucontext = (ucontext_t *) malloc(sizeof(ucontext_t));
+    add_context_to_queue(ucontext);
+    swapcontext(ucontext, c_exec_execute_context);
 }
 
 void sut_exit() {
-
+    setcontext(c_exec_execute_context);
 }
 
 int sut_open(char *file_name) {
