@@ -39,7 +39,7 @@ void sut_init() {
     pthread_create(c_exec, NULL, c_exec_execute, NULL);
 }
 
-bool add_context_to_queue(ucontext_t *ucontext) {
+bool add_context_to_queue(ucontext_t *const ucontext) {
     struct queue_entry *const node = queue_new_node(ucontext);
     if (node == NULL) {
         return false;
@@ -55,6 +55,7 @@ bool sut_create(sut_task_f fn) {
     if (ucontext == NULL) {
         return false;
     }
+
     if (getcontext(ucontext) < 0) {
         return false;
     }
