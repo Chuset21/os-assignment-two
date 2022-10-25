@@ -31,15 +31,20 @@ void *c_exec_execute(__attribute__((unused)) void *arg) {
 }
 
 void *i_exec_execute(__attribute__((unused)) void *arg) {
+    int i = 0;
     while (c_exec) {
         is_doing_work = true;
         pthread_mutex_lock(&io_lock);
         const struct queue_entry *const pop = queue_pop_head(&io_queue);
         pthread_mutex_unlock(&io_lock);
         if (pop == NULL) {
-            is_doing_work = false;
+            i++;
+            if (i >= 10) {
+                is_doing_work = false;
+            }
             usleep(100);
         } else {
+            i = 0;
             const ucontext_t *const ucontext = (ucontext_t *) (pop->data);
             swapcontext(i_exec_context, ucontext);
         }
