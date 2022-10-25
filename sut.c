@@ -6,24 +6,33 @@
 #include "queue.h"
 
 pthread_t *c_exec, *i_exec;
-pthread_mutex_t exec_lock, io_lock;
+pthread_mutex_t exec_lock, io_lock, sem_lock;
 struct queue exec_queue, io_queue;
 ucontext_t *c_exec_context, *i_exec_context;
+int sem;
 bool is_doing_work;
 
 #define STACK_SIZE (1024*1024)
 
 void *c_exec_execute(__attribute__((unused)) void *arg) {
+    bool start = true;
     while (true) {
         pthread_mutex_lock(&exec_lock);
         const struct queue_entry *const pop = queue_pop_head(&exec_queue);
         pthread_mutex_unlock(&exec_lock);
         if (pop == NULL) {
-            if (!is_doing_work) {
-                return NULL;
+            if (!is_doing_work && !start) {
+                bool shutdown;
+                pthread_mutex_lock(&sem_lock);
+                shutdown = sem == 0;
+                pthread_mutex_unlock(&sem_lock);
+                if (shutdown) {
+                    return NULL;
+                }
             }
-            usleep(100);
+            nanosleep((const struct timespec[]) {{0, 100000L}}, NULL);
         } else {
+            start = false;
             const ucontext_t *const ucontext = (ucontext_t *) (pop->data);
             swapcontext(c_exec_context, ucontext);
         }
@@ -31,29 +40,27 @@ void *c_exec_execute(__attribute__((unused)) void *arg) {
 }
 
 void *i_exec_execute(__attribute__((unused)) void *arg) {
-    int i = 0;
     while (c_exec) {
-        is_doing_work = true;
         pthread_mutex_lock(&io_lock);
         const struct queue_entry *const pop = queue_pop_head(&io_queue);
         pthread_mutex_unlock(&io_lock);
         if (pop == NULL) {
-            i++;
-            if (i >= 10) {
-                is_doing_work = false;
-            }
-            usleep(100);
+            is_doing_work = false;
+            nanosleep((const struct timespec[]) {{0, 100000L}}, NULL);
         } else {
-            i = 0;
+            is_doing_work = true;
             const ucontext_t *const ucontext = (ucontext_t *) (pop->data);
             swapcontext(i_exec_context, ucontext);
+            is_doing_work = true;
         }
     }
     return NULL;
 }
 
 void sut_init() {
+    sem = 0;
     is_doing_work = true;
+    pthread_mutex_init(&sem_lock, PTHREAD_MUTEX_DEFAULT);
     pthread_mutex_init(&exec_lock, PTHREAD_MUTEX_DEFAULT);
     pthread_mutex_init(&io_lock, PTHREAD_MUTEX_DEFAULT);
 
@@ -120,6 +127,10 @@ void sut_exit() {
 }
 
 int sut_open(char *file_name) {
+    pthread_mutex_lock(&sem_lock);
+    sem++;
+    pthread_mutex_unlock(&sem_lock);
+
     ucontext_t *const ucontext = (ucontext_t *) malloc(sizeof(ucontext_t));
 
     struct queue_entry *const node = queue_new_node(ucontext);
@@ -138,10 +149,18 @@ int sut_open(char *file_name) {
 
     swapcontext(ucontext, i_exec_context);
 
+    pthread_mutex_lock(&sem_lock);
+    sem--;
+    pthread_mutex_unlock(&sem_lock);
+
     return result;
 }
 
 void sut_write(int fd, char *buf, int size) {
+    pthread_mutex_lock(&sem_lock);
+    sem++;
+    pthread_mutex_unlock(&sem_lock);
+
     ucontext_t *const ucontext = (ucontext_t *) malloc(sizeof(ucontext_t));
 
     struct queue_entry *const node = queue_new_node(ucontext);
@@ -159,9 +178,17 @@ void sut_write(int fd, char *buf, int size) {
     pthread_mutex_unlock(&exec_lock);
 
     swapcontext(ucontext, i_exec_context);
+
+    pthread_mutex_lock(&sem_lock);
+    sem--;
+    pthread_mutex_unlock(&sem_lock);
 }
 
 void sut_close(int fd) {
+    pthread_mutex_lock(&sem_lock);
+    sem++;
+    pthread_mutex_unlock(&sem_lock);
+
     ucontext_t *const ucontext = (ucontext_t *) malloc(sizeof(ucontext_t));
 
     struct queue_entry *const node = queue_new_node(ucontext);
@@ -179,9 +206,17 @@ void sut_close(int fd) {
     pthread_mutex_unlock(&exec_lock);
 
     swapcontext(ucontext, i_exec_context);
+
+    pthread_mutex_lock(&sem_lock);
+    sem--;
+    pthread_mutex_unlock(&sem_lock);
 }
 
 char *sut_read(int fd, char *buf, int size) {
+    pthread_mutex_lock(&sem_lock);
+    sem++;
+    pthread_mutex_unlock(&sem_lock);
+
     ucontext_t *const ucontext = (ucontext_t *) malloc(sizeof(ucontext_t));
 
     struct queue_entry *const node = queue_new_node(ucontext);
@@ -199,6 +234,10 @@ char *sut_read(int fd, char *buf, int size) {
     pthread_mutex_unlock(&exec_lock);
 
     swapcontext(ucontext, i_exec_context);
+
+    pthread_mutex_lock(&sem_lock);
+    sem--;
+    pthread_mutex_unlock(&sem_lock);
 
     return result;
 }
