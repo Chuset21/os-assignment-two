@@ -124,7 +124,7 @@ int sut_open(char *file_name) {
 
     swapcontext(ucontext, c_exec_context);
 
-    const int result = open((char *) file_name, O_RDWR | O_CREAT, 0600);
+    const int result = open(file_name, O_RDWR | O_CREAT | O_APPEND, 0600);
 
     pthread_mutex_lock(&exec_lock);
     queue_insert_tail(&exec_queue, node);
