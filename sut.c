@@ -147,7 +147,12 @@ void sut_write(int fd, char *buf, int size) {
     swapcontext(ucontext, c_exec_context);
 
     write(fd, buf, size);
-    setcontext(i_exec_context);
+
+    pthread_mutex_lock(&exec_lock);
+    queue_insert_tail(&exec_queue, node);
+    pthread_mutex_unlock(&exec_lock);
+
+    swapcontext(ucontext, i_exec_context);
 }
 
 void sut_close(int fd) {
@@ -162,7 +167,12 @@ void sut_close(int fd) {
     swapcontext(ucontext, c_exec_context);
 
     close(fd);
-    setcontext(i_exec_context);
+
+    pthread_mutex_lock(&exec_lock);
+    queue_insert_tail(&exec_queue, node);
+    pthread_mutex_unlock(&exec_lock);
+
+    swapcontext(ucontext, i_exec_context);
 }
 
 char *sut_read(int fd, char *buf, int size) {
