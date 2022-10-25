@@ -190,6 +190,7 @@ char *sut_read(int fd, char *buf, int size) {
 void sut_shutdown() {
     pthread_join(*c_exec, NULL);
     free(c_exec);
+    c_exec = NULL;
     pthread_join(*i_exec, NULL);
     free(i_exec);
     free(c_exec_context);
