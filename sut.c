@@ -21,6 +21,7 @@ void *c_exec_execute(__attribute__((unused)) void *arg) {
         const struct queue_entry *const pop = queue_pop_head(&exec_queue);
         pthread_mutex_unlock(&exec_lock);
         if (pop == NULL) {
+            // start, is_doing_work and sem are all used to see if there is no more work left.
             if (!is_doing_work && !start) {
                 bool shutdown;
                 pthread_mutex_lock(&sem_lock);
