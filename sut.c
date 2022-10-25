@@ -148,7 +148,7 @@ void decrement_sem() {
 
 int sut_open(char *file_name) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
-    const ucontext_t *const ucontext = (ucontext_t *) node->data;
+    ucontext_t *const ucontext = (ucontext_t *) node->data;
 
     swapcontext(ucontext, c_exec_context);
 
@@ -165,7 +165,7 @@ int sut_open(char *file_name) {
 
 void sut_write(int fd, char *buf, int size) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
-    const ucontext_t *const ucontext = (ucontext_t *) node->data;
+    ucontext_t *const ucontext = (ucontext_t *) node->data;
 
     swapcontext(ucontext, c_exec_context);
 
@@ -180,7 +180,7 @@ void sut_write(int fd, char *buf, int size) {
 
 void sut_close(int fd) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
-    const ucontext_t *const ucontext = (ucontext_t *) node->data;
+     ucontext_t *const ucontext = (ucontext_t *) node->data;
 
     swapcontext(ucontext, c_exec_context);
 
@@ -195,7 +195,7 @@ void sut_close(int fd) {
 
 char *sut_read(int fd, char *buf, int size) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
-    const ucontext_t *const ucontext = (ucontext_t *) node->data;
+     ucontext_t *const ucontext = (ucontext_t *) node->data;
 
     swapcontext(ucontext, c_exec_context);
 
