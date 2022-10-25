@@ -250,4 +250,5 @@ void sut_shutdown() {
     pthread_join(*i_exec, NULL);
     free(i_exec);
     free(c_exec_context);
+    free(i_exec_context);
 }
