@@ -25,6 +25,7 @@ void *c_exec_execute(__attribute__((unused)) void *arg) {
             if (!is_doing_work && !start && sem == 0) {
                 return NULL;
             }
+            // Sleep for some time
             nanosleep((const struct timespec[]) {{0, 100000L}}, NULL);
         } else {
             start = false;
@@ -35,12 +36,14 @@ void *c_exec_execute(__attribute__((unused)) void *arg) {
 }
 
 void *i_exec_execute(__attribute__((unused)) void *arg) {
+    // Run until c_exec thread stops running
     while (c_exec) {
         pthread_mutex_lock(&io_lock);
         const struct queue_entry *const pop = queue_pop_head(&io_queue);
         pthread_mutex_unlock(&io_lock);
         if (pop == NULL) {
             is_doing_work = false;
+            // Sleep for some time
             nanosleep((const struct timespec[]) {{0, 100000L}}, NULL);
         } else {
             is_doing_work = true;
@@ -52,6 +55,7 @@ void *i_exec_execute(__attribute__((unused)) void *arg) {
 }
 
 void sut_init() {
+    // Initialise semaphore like variable to 0
     sem = 0;
     is_doing_work = true;
     pthread_mutex_init(&sem_lock, PTHREAD_MUTEX_DEFAULT);
@@ -73,12 +77,21 @@ void sut_init() {
     pthread_create(i_exec, NULL, i_exec_execute, NULL);
 }
 
+/**
+ * Insert a node into the exec queue.
+ * @param node The queue_entry to insert.
+ */
 void insert_node_in_exec_queue(struct queue_entry *const node) {
     pthread_mutex_lock(&exec_lock);
     queue_insert_tail(&exec_queue, node);
     pthread_mutex_unlock(&exec_lock);
 }
 
+/**
+ * Add a context to the exec queue.
+ * @param ucontext The context to add to the queue.
+ * @return true if successfully added to queue, false otherwise
+ */
 bool add_context_to_queue(ucontext_t *const ucontext) {
     struct queue_entry *const node = queue_new_node(ucontext);
     if (node == NULL) {
@@ -100,6 +113,7 @@ bool sut_create(sut_task_f fn) {
         return false;
     }
 
+    // Create space for the stack
     char *const uc_s = (char *) malloc(sizeof(char) * (STACK_SIZE));
     if (uc_s == NULL) {
         return false;
@@ -124,7 +138,12 @@ void sut_exit() {
     setcontext(c_exec_context);
 }
 
+/**
+ * Make an empty context, add it to a node and add it to the back of the io queue.
+ * @return The node with the empty context as its data
+ */
 struct queue_entry *make_empty_context_and_add_to_io() {
+    // Increment the semaphore
     pthread_mutex_lock(&sem_lock);
     sem++;
     pthread_mutex_unlock(&sem_lock);
@@ -140,6 +159,9 @@ struct queue_entry *make_empty_context_and_add_to_io() {
     return node;
 }
 
+/**
+ * Decrement the semaphore.
+ */
 void decrement_sem() {
     pthread_mutex_lock(&sem_lock);
     sem--;
@@ -150,16 +172,20 @@ int sut_open(char *file_name) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
     ucontext_t *const ucontext = (ucontext_t *) node->data;
 
+    // Save the context at this point, and go back to the c_exec scheduler
     swapcontext(ucontext, c_exec_context);
 
     const int result = open(file_name, O_RDWR | O_CREAT | O_APPEND, 0600);
 
+    // Insert the node into the exec queue once the io thread has produced a result
     insert_node_in_exec_queue(node);
 
+    // Save the context at this point, and go back to the i_exec scheduler
     swapcontext(ucontext, i_exec_context);
 
     decrement_sem();
 
+    // Return the result via the c_exec thread
     return result;
 }
 
@@ -167,12 +193,15 @@ void sut_write(int fd, char *buf, int size) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
     ucontext_t *const ucontext = (ucontext_t *) node->data;
 
+    // Save the context at this point, and go back to the c_exec scheduler
     swapcontext(ucontext, c_exec_context);
 
     write(fd, buf, size);
 
+    // Insert the node into the exec queue once the io thread has produced a result
     insert_node_in_exec_queue(node);
 
+    // Save the context at this point, and go back to the i_exec scheduler
     swapcontext(ucontext, i_exec_context);
 
     decrement_sem();
@@ -180,14 +209,17 @@ void sut_write(int fd, char *buf, int size) {
 
 void sut_close(int fd) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
-     ucontext_t *const ucontext = (ucontext_t *) node->data;
+    ucontext_t *const ucontext = (ucontext_t *) node->data;
 
+    // Save the context at this point, and go back to the c_exec scheduler
     swapcontext(ucontext, c_exec_context);
 
     close(fd);
 
+    // Insert the node into the exec queue once the io thread has produced a result
     insert_node_in_exec_queue(node);
 
+    // Save the context at this point, and go back to the i_exec scheduler
     swapcontext(ucontext, i_exec_context);
 
     decrement_sem();
@@ -195,18 +227,22 @@ void sut_close(int fd) {
 
 char *sut_read(int fd, char *buf, int size) {
     struct queue_entry *const node = make_empty_context_and_add_to_io();
-     ucontext_t *const ucontext = (ucontext_t *) node->data;
+    ucontext_t *const ucontext = (ucontext_t *) node->data;
 
+    // Save the context at this point, and go back to the c_exec scheduler
     swapcontext(ucontext, c_exec_context);
 
     char *const result = read(fd, buf, size) < 0 ? NULL : buf;
 
+    // Insert the node into the exec queue once the io thread has produced a result
     insert_node_in_exec_queue(node);
 
+    // Save the context at this point, and go back to the i_exec scheduler
     swapcontext(ucontext, i_exec_context);
 
     decrement_sem();
 
+    // Return the result via the c_exec thread
     return result;
 }
 
